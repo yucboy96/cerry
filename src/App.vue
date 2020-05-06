@@ -125,20 +125,29 @@
                     this.$message.error('Comment is empty!');
                     return;
                 }
+                if (this.commentSet.length === 0) {
+                    this.commentSet = new Array(this.commentIndexMap.length);
+                    this.commentTimeSet = new Array(this.commentIndexMap.length);
+                    for (var k = 0; k < this.commentTimeSet.length; k++) {
+                        this.commentTimeSet[k] = {watchTime: [], typeTime: []}
+                        this.commentSet[k] = {comment: '', interpreted: false}
+                    }
+                }
+
                 this.e = this.second;
                 this.commentTimeSet[this.indexNow].watchTime.push([this.s, this.e]);
                 this.s = this.e;
                 this.commentSet[this.indexNow].comment = this.editText;
                 this.commentSet[this.indexNow].interpreted = this.interpreted;
                 this.$store.commit('setCommentIndexMap', this.indexNow);
-                if (this.indexNow === this.commentSet.length - 1) {
-                    var notFinishList = [];
-                    for (var i = 0; i < this.commentSet.length; i++)
-                        if (this.commentSet[i].comment === '') {
-                            notFinishList.push(i + 1)
-                        }
-                    this.dialog(notFinishList);
-                }
+                // if (this.indexNow === this.commentSet.length - 1) {
+                //     var notFinishList = [];
+                //     for (var i = 0; i < this.commentSet.length; i++)
+                //         if (this.commentSet[i].comment === '') {
+                //             notFinishList.push(i + 1)
+                //         }
+                //     this.dialog(notFinishList);
+                // }
                 this.$refs.codeMain.next();
             },
             dialog(notFinishList) {
@@ -220,7 +229,8 @@
                     this.timer = null;
                     this.commentSet = [];
                     this.commentTimeSet = [];
-                    this.$store.commit("iniCommentIndexMap", []);
+                    this.editText=''
+                    // this.$store.commit("iniCommentIndexMap", []);
                 })
             }
         }

@@ -1,15 +1,16 @@
 <template>
     <div id="file_container">
         <div class="button-container">
-            <el-upload ref="upload" action="http://13.com" :multiple="false"
-                       :on-change="fileChange"
-                       :file-list="fileList" :auto-upload="false" list-type="text" :before-upload="beforeUpload"
-                       :limit="1">
-                <el-button icon="el-icon-folder-opened" slot="trigger" size="small"
-                           plain round
-                           style="width:100px;padding-left:0px;margin-right:0px;font-size: 14px;">File
-                </el-button>
-            </el-upload>
+            <!--<el-upload-->
+                        <!--ref="upload" action="http://13.com" :multiple="false"-->
+                       <!--:on-change="fileChange"-->
+                       <!--:file-list="fileList" :auto-upload="false" list-type="text" :before-upload="beforeUpload"-->
+                       <!--:limit="1">-->
+                <!--<el-button icon="el-icon-folder-opened" slot="trigger" size="small"-->
+                           <!--plain round-->
+                           <!--style="width:100px;padding-left:0px;margin-right:0px;font-size: 14px;">File-->
+                <!--</el-button>-->
+            <!--</el-upload>-->
             <el-button icon="el-icon-upload" size="small"
                        plain round
                        v-if="false"
@@ -35,8 +36,10 @@
                       ref="input1"
                       :autosize="autoSize"
                       type="textarea"
+                      readonly
                       placeholder="请输入内容"
                       v-model="input" v-show="!interpreted">
+
             </el-input>
             <div id="code_container" v-show="interpreted">
                 <div style="margin: 10px;">
@@ -67,7 +70,7 @@
     import CodeBlob from "./code_blob"
     import Axios from 'axios'
     import {Loading} from 'element-ui';
-    import {ncodeKeyIndexHandler,genBlankArray} from "../tools";
+    import {ncodeKeyIndexHandler,genBlankArray,getCodeChip} from "../tools";
     import Formatter from "auto-format"
 
     function findLine(res) {
@@ -193,7 +196,10 @@
             that.input = javaFormatter.format(res.code.join('\n')).join('\n');
         }
         that.$store.commit('setComment', [res.comment]);
-        that.$store.commit('setInterpretedComment', findLine(res))
+        that.jsonMode.res[that.jsonMode.i].comment = res.comment;
+        var interpretedComment  = findLine(res);
+        that.jsonMode.res[that.jsonMode.i].interpretedComment = interpretedComment
+        that.$store.commit('setInterpretedComment', interpretedComment)
     }
 
     export default {
@@ -203,7 +209,6 @@
         },
         data() {
             return {
-                input: 'userInput',
                 fileList: [],
                 blankArray:[],
                 jsonMode: {
@@ -215,7 +220,8 @@
                 autoSize: {
                     'minRows': 15,
                     'maxRows': 15
-                }
+                },
+                input:''
             }
         },
         computed: {
@@ -228,6 +234,7 @@
                     return "0/0";
                 else
                     return String(this.jsonMode.i + 1) + '/' + String(this.jsonMode.res.length)
+                // return String(this.codeChip.i+1)+'/10';
 
             }
         },
@@ -237,30 +244,56 @@
             }
         },
         mounted: function () {
+            this.init()
         },
         methods: {
+            init(){
+                this.jsonMode.res= getCodeChip()
+                this.jsonMode.i = 0;
+                this.formatInput()
+                for (var i = 0; i < this.jsonMode.res.length; i++)
+                    this.jsonMode.map.push(false);
+                this.$store.commit("iniCommentIndexMap", this.jsonMode.map);
+            },
             clear() {
                 this.$store.commit('setInterpreted', false);
                 this.$store.commit('setComment', []);
-                this.$store.commit('setCode', []);
+                // this.$store.commit('setCode', []);
                 this.$store.commit('setInterpretedComment', []);
-                this.input = "userInput";
                 this.jsonMode.i = 0;
                 this.jsonMode.mode = false;
                 this.jsonMode.res = [];
                 this.jsonMode.map =[];
                 this.blankArray = [];
+                this.init()
+            },
+            formatInput(){
+                this.$store.commit('setInterpreted', false);
+                var javaFormatter = Formatter.createJavaFormatter("    ");
+                var newncode = javaFormatter.format(this.jsonMode.res[this.jsonMode.i].ncode.join('\n'));
+                this.blankArray = genBlankArray(newncode,this.jsonMode.res[this.jsonMode.i].ncode);
+                this.input = newncode.join('\n');
+                this.$store.commit('setCode', nsplitcode(this.jsonMode.res[this.jsonMode.i].ncode));
+                this.$store.commit('setIndexNow', this.jsonMode.i);
+                if (this.jsonMode.res[this.jsonMode.i].interpretedComment){
+                    this.$store.commit('setComment', this.jsonMode.res[this.jsonMode.i].comment);
+                    this.$store.commit('setInterpretedComment', this.jsonMode.res[this.jsonMode.i].interpretedComment)
+                }
+                else {
+                    this.$store.commit('setComment', []);
+                    this.$store.commit('setInterpretedComment', [])
+                }
             },
             next() {
                 if (this.jsonMode.i < this.jsonMode.res.length - 1) {
                     this.jsonMode.i += 1;
-                    ongetRes(this, this.jsonMode.res[this.jsonMode.i]);
+                    this.formatInput()
                 }
             },
             previous() {
                 if (this.jsonMode.i >= 1) {
                     this.jsonMode.i -= 1;
-                    ongetRes(this, this.jsonMode.res[this.jsonMode.i]);
+                    this.formatInput()
                 }
             },
             fileChange(file) {
@@ -292,13 +325,14 @@
             },
             submitUpload() {
                 // let data = {"code": this.input, "mode": "nsbt"};
-                let data = {"code": "protected void unregisterlistener ( ) {\n metadataprovider mdp = attributetype . getmetadataprovider ( ) ;\n if ( mdp != null ) {\n mdp . removemetadatachangelistener ( this ) ;\n }\n }", "mode": "nsbt"};
+                let data = {"code": this.jsonMode.res[this.jsonMode.i].ncode.join('\n'), "mode": "nsbt"};
                 let loadingInstance = Loading.service({fullscreen: true});
-                Axios.post("interpret", data)
+                Axios.post("http://10.144.5.120:8888/api/interpret", data)
                     .then(res => {
                         this.$nextTick(() => { // 以服务的方式调用的 Loading 需要异步关闭
                             loadingInstance.close();
                         });
+                        res.ncode = data.code.split('\n');
                         ongetRes(this, res.data);
                         this.$store.commit('setInterpreted', !this.$store.state.interpreted)
                     });
